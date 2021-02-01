@@ -20,8 +20,9 @@ const salesDataSchema = new Schema({
     //     ref : 'salesPriceDatas'
     // },
     Car : {
-        type : String,
-        index : true
+        type : mongoose.Schema.Types.ObjectId,
+        index : true,
+        ref : 'CompanyWiseDatas'
     },
     Color : {
         type : String,

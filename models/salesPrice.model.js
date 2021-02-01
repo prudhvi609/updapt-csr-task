@@ -7,7 +7,8 @@ const salesPriceDataSchema = new Schema({
         index : true
     },
     City : {
-        type : String,
+        type : mongoose.Schema.Types.ObjectId,
+        ref : 'ZonalDatas',
         index : true,
         required : true
     },

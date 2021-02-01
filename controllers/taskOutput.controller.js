@@ -26,7 +26,7 @@ class TaskOutput {
             let removeEmptyArray = xlData.shift();
             let getHeaderRow = xlData.shift();
             for (let value of xlData) {
-                let time = await moment(value[1]).local().add(1, 'minute').format()
+                let time = await moment(value[1]).local().add(1, 'minute').format().toISOString();
                 let createSalesData = await salesDataModel.insertMany({
                     sNo: value[0],
                     Date: time,
@@ -90,7 +90,7 @@ class TaskOutput {
                     else return err;
 
                 });
-                
+
             }
         }
         catch (err) {
@@ -290,11 +290,140 @@ class TaskOutput {
                         let salesPrice = indivCar.CityId[0][carName];
                         let NumberOfCarsIndiv = indivCar.NumberOfVehiclesSold;
                         averageSaleValue = (NumberOfCarsIndiv * salesPrice) / NoOfVehiclesSold;
-                        
+
                         buildArray.push(averageSaleValue);
+                        console.log(buildArray);
                     }
                 }
             }
+        }
+        catch (err) {
+            return err;
+        }
+    }
+
+    /**
+     Provide data for Bar graph representing White car sales across the months 
+     that are above the average sales value for the respective months
+    */
+    static async task3(req, res, next) {
+        try {
+            let monthStart = moment().startOf('month').format();
+            let monthEnd = moment().endOf('month').format();
+
+            const payload = {
+                "year": 2021,
+                "month": 1 
+            }
+
+            const from = new Date(Date.UTC(payload.year, payload.month, 1)).toISOString(); // "2019-12-01T00:00:00.000Z"
+            const to = new Date(Date.UTC(payload.year, payload.month + 1, 1)).toISOString();
+
+            let joinTablesWithSalesData = await salesDataModel.aggregate([
+                {
+                    $match:
+                    {
+                        Color: { $ne: 'White' },
+                        // Date: {
+                        //     $lt: to,
+                        //     $gte: from,
+                        // }
+                    }
+                },
+
+                {
+                    $lookup: {
+                        from: 'companywisedatas',
+                        localField: 'Car',
+                        foreignField: 'Cars',
+                        as: 'CarId'
+                    }
+                },
+                {
+                    $lookup: {
+                        from: 'salespricedatas',
+                        localField: 'City',
+                        foreignField: 'City',
+                        as: 'CityId'
+                    }
+                },
+                {
+                    $group: {
+                        _id:
+                        {
+                            // 'City': '$City',
+                            'Car': '$Car'
+                        },
+                        'NumberOfVehiclesSold': { $sum: '$NumberOfVehiclesSold' },
+                        'Car': { '$first': '$Car' },
+                        'City': { '$first': '$City' },
+                        'Color': { '$first': '$Color' },
+                        'Date': { '$first': '$Date' },
+                        'CarId': { '$first': '$CarId' },
+                        'CityId': { '$first': '$CityId' },
+                        // 'averageSaleValue' : { $mul : ['$NumberOfVehiclesSold',`cityId.${Car}`]}
+                    }
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        // 'month' : {
+                        //     $month : Date
+                        // }
+                    }
+                }
+            ]);
+            let totalCarsSold = await salesDataModel.aggregate([
+                {
+                    $group: {
+                        _id: null, TotalVehiclesSold: {
+                            $sum: '$NumberOfVehiclesSold'
+                        }
+                    }
+                }
+            ]);
+            let totalNumberOfVehiclesSold = totalCarsSold[0].TotalVehiclesSold;
+            function calculateAverageSale(input) {
+                var arrayNew = [];
+                var subArray = [];
+                var newObj = {};
+                let indivSet;
+                let carName;
+                let NoOfVehiclesSold;
+                let salesPrice;
+                let averageSaleValue;
+                let d;
+                function func2(thingFromForLoop) {                    
+                    if (arrayNew.includes(thingFromForLoop)) {
+                        return arrayNew;
+                    }
+                    else {
+                        arrayNew.push(thingFromForLoop);
+                    }
+                    return arrayNew;
+                }
+
+                for (indivSet of input) {
+                    carName = indivSet.Car;
+                    NoOfVehiclesSold = indivSet.NumberOfVehiclesSold;
+                    salesPrice = indivSet.CityId[0][carName];
+                    averageSaleValue = (NoOfVehiclesSold * salesPrice) / totalNumberOfVehiclesSold;
+                    newObj['Car'] = indivSet.Car;
+                    newObj['City'] = indivSet.City;
+                    newObj['Color'] = indivSet.Color;
+                    newObj['NumberOfVehiclesSold'] = indivSet.NumberOfVehiclesSold;
+                    newObj['Date'] = indivSet.Date;
+                    newObj['CarId'] = indivSet.CarId;
+                    newObj['CityId'] = indivSet.CityId;
+                    newObj['averageSaleValue'] = averageSaleValue;
+                    d = func2(newObj);
+                    arrayNew.push(d);
+                    
+                    console.log(arrayNew[0]);
+                }
+            }
+            calculateAverageSale(joinTablesWithSalesData);
+
         }
         catch (err) {
             return err;
@@ -310,6 +439,11 @@ class TaskOutput {
 
 // TaskOutput.task1();
 
-// TaskOutput.task4();
+// TaskOutput.task2();
+
+// TaskOutput.task3();
+
+TaskOutput.task4();
+
 
 module.exports = TaskOutput;
